@@ -6,9 +6,10 @@ ARG OPENCOREAMR_VERSION=0.1.6
 ARG OPENCOREAMR_URL="https://sourceforge.net/projects/opencore-amr/files/opencore-amr/opencore-amr-$OPENCOREAMR_VERSION.tar.gz"
 ARG OPENCOREAMR_SHA256=483eb4061088e2b34b358e47540b5d495a96cd468e361050fae615b1809dc4a1
 
-# bump: alpine /FROM alpine:([\d.]+)/ docker:alpine|^3
-# bump: alpine link "Release notes" https://alpinelinux.org/posts/Alpine-$LATEST-released.html
-FROM alpine:3.16.2 AS base
+# Must be specified
+ARG ALPINE_VERSION
+
+FROM alpine:${ALPINE_VERSION} AS base
 
 FROM base AS download
 ARG OPENCOREAMR_URL
@@ -30,9 +31,17 @@ COPY --from=download /tmp/opencoreamr/ /tmp/opencoreamr/
 WORKDIR /tmp/opencoreamr
 RUN \
   apk add --no-cache --virtual build \
-    build-base && \
+    build-base pkgconf && \
   ./configure --enable-static --disable-shared && \
   make -j$(nproc) install && \
+  # Sanity tests
+  pkg-config --exists --modversion --path opencore-amrnb && \
+  pkg-config --exists --modversion --path opencore-amrwb && \
+  ar -t /usr/local/lib/libopencore-amrnb.a && \
+  ar -t /usr/local/lib/libopencore-amrwb.a && \
+  readelf -h /usr/local/lib/libopencore-amrnb.a && \
+  readelf -h /usr/local/lib/libopencore-amrwb.a && \
+  # Cleanup
   apk del build
 
 FROM scratch
